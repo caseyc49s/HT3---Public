@@ -1,6 +1,6 @@
 # Honda Team 3 Repository
 
-This repository is for collaboration between team members on the final project for the Spring 2019 Data-X at UC Berkeley.
+This repository contains the Honda Team 3 project for the Spring 2019 Data-X at UC Berkeley.
 
 ## __Our Project__ (_please edit as this changes_)
 
