@@ -2,31 +2,21 @@
 
 This repository contains the Honda Team 3 project for the Spring 2019 Data-X at UC Berkeley.
 
-## __Our Project__ (_please edit as this changes_)
+---
 
-__TOPIC__: How early should an ADAS warning be presented to be most effective.
+# __Midterm Report__ links to Files:
 
-  - __Part1__: Compare the driver behavior at smart vs non smart intersections (metrics: acceleration, braking, speed, location, flow, number of messages received etc)  
-    + Visualize/ Classify Intersections
-        + Find Intersection Coordinates
-        + Split into smart vs. non-smart
-        + Can look at SPAT table for non-smart intersection IDs
-    + Determine which intersection Host vehicle is heading to
-        + Use location and orientation (in Host Table)
-        + Can also use Google Maps
-    + Aggregate Stats for smart vs. non-smart
-    + Add Findings in UI
+1. __Datasets:__ In the private repo (per Honda's request)
 
-  - __Part2__: Determine optimal location of future smart intersections based on intersection characteristics
-    + Safety
-        + Possibly Merge Collision Data
-        + Weather
-        + Event Flags
-    + Find most similar Intersections
-        + Number of lanes
-        + Distance from one to the next
-    + Add to UI (make interactive map GUI)
+2. __EDA:__
+    - Initial data
+        - [Basic Data Exploration](https://github.com/caseyc49s/HT3---Public/blob/CCdesktop/EDA/Basic_Data_Exploration.ipynb)
+        - [NewDataset](https://github.com/caseyc49s/HT3---Public/blob/master/EDA/newdataset%20-%20Copy.ipynb)
+    - Cleaned/Processed Data
+        - [Reactiveness](https://github.com/caseyc49s/HT3---Public/blob/master/EDA/preprocess_hdf.ipynb)
 
-  - __UI__: Could be a Interactive Map of Findings
+3. __Baseline Model:__
 
-<https://transportationops.org/sites/transops/files/SPaT%20challenge%20Folio%20imposed.pdf>
+    - [Process](https://github.com/caseyc49s/HT3---Public/blob/master/Preprocessing/bzw7_process.ipynb)
+    
+
