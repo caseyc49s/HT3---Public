@@ -1,0 +1,358 @@
+---
+title: "test_functions"
+author: "Casey Chadwell"
+date: "May 7, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(leaflet)
+library(stringr)
+library(ggplot2)
+library(dplyr)
+```
+
+## Load Data
+
+```{r}
+# Data
+evt_warn <- read.csv('Data/EvtWarn.csv')
+rv_bsm <- read.csv('Data/RvBsm.csv')
+
+# Get host data per device
+get_host <- function(device_id) {
+  device <- toString(device_id)
+  filepath <- paste0('Gen_Data/host_', device, '.csv')
+  return(read.csv(filepath))
+}
+```
+
+```{r}
+unique(evt_warn$EventAppId)
+unique(rv_bsm$BrakeStatus)
+evt_warn[evt_warn$EventAppId == 9,]
+```
+
+## Functions
+```{r}
+# filter host for selected device (every 4th column)
+filter_host <- function(selected_device) {
+  host_f <- get_host(selected_device)
+  #cols_idx = which(host_f$Trip == 54.0)
+  #return(host_f[seq(cols_idx[1], cols_idx[length(cols_idx)], 4), c('Latitude', 'Longitude', 'Speed')])
+  return(host_f[seq(1, length(host_f), 4), c('Latitude', 'Longitude', 'Speed', 'Time', 'TurnSignal')])
+}
+
+# filter rv_bsm or evt_warn for selected device
+filter_df <- function(df=NULL, device, host = FALSE) {
+  if(host) {
+    df <- get_host(device)
+    return(df[, c('Trip','Latitude', 'Longitude', 'Speed', 'Time', 'TurnSignal')])
+  }
+  return(df[df["Device"] == device,])
+}
+
+filter_trip <- function(df, trips) {
+  return(df[df$Trip %in% trips,])
+}
+```
+
+## Test Device
+```{r}
+dev = 2004
+```
+
+# Get Trips per Device
+```{r}
+print("Rv")
+filter_rv <- filter_df(rv_bsm, dev)
+unique(filter_rv$Trip)
+
+print("evt")
+filter_evt <- filter_df(evt_warn, dev)
+unique(filter_evt$Trip)
+
+print("host")
+filter_host <- filter_df(host, dev, TRUE)
+unique(filter_host$Trip)
+```
+
+
+```{r}
+
+df_choices <- c('host_selected', 'rv_bsm_selected', 'evt_warn_selected')
+
+data <- list(
+  "host" = filter_df(device = dev, host = TRUE),
+  "rv_bsm" = filter_df(rv_bsm, device = dev),
+  "evt_warn" = filter_df(evt_warn, device = dev)
+  
+)
+```
+```{r}
+data$host$Trip
+```
+
+```{r}
+
+unique_trips <- NULL
+
+if ('host_selected' %in% df_choices) {
+  unique_trips <- unique(data$host$Trip)
+}
+if ('rv_bsm_selected' %in% df_choices) {
+  rv_bsm_trips <- unique(data$rv_bsm$Trip)
+  if (is.null(unique_trips)) {
+    unique_trips <- rv_bsm_trips
+  }
+  else {
+    unique_trips <- intersect(unique_trips, rv_bsm_trips)
+  }
+}
+if ('evt_warn_selected' %in% df_choices) {
+  evt_warn_trips <- unique(data$evt_warn$Trip)
+  if (is.null(unique_trips)) {
+    unique_trips <- evt_warn_trips
+  }
+  else {
+    unique_trips <- intersect(unique_trips, evt_warn_trips)
+  }
+}
+```
+
+```{r}
+unique_trips
+```
+## Filter By Trip
+```{r}
+
+filter_times <- function(df, times) {
+  return(df[(df$Time >= times[1]) & (df$Time <= times[2]),])
+}
+
+host_f <- filter_trip(
+  filter_df(device = dev, host = TRUE),
+  unique(filter_df(evt_warn, device = dev)$Trip)
+)
+
+host_ft <- filter_trip(host_f, 12)
+```
+
+```{r}
+str(host_ft)
+```
+
+```{r}
+evt_warn_ff <- evt_warn %>%
+  group_by(EventAppId, AlertLevel) %>%
+  filter(Time == min(Time)) 
+
+evt_warn_ff
+```
+```{r}
+library(sp)
+library(maptools)
+points_to_line <- function(data, long, lat, id_field = NULL, sort_field = NULL) {
+  
+  # Convert to SpatialPointsDataFrame
+  coordinates(data) <- c(long, lat)
+  
+  # If there is a sort field...
+  if (!is.null(sort_field)) {
+    if (!is.null(id_field)) {
+      data <- data[order(data[[id_field]], data[[sort_field]]), ]
+    } else {
+      data <- data[order(data[[sort_field]]), ]
+    }
+  }
+  
+  # If there is only one path...
+  if (is.null(id_field)) {
+    
+    lines <- SpatialLines(list(Lines(list(Line(data)), "id")))
+    
+    return(lines)
+    
+    # Now, if we have multiple lines...
+  } else if (!is.null(id_field)) {  
+    
+    # Split into a list by ID field
+    paths <- sp::split(data, data[[id_field]])
+    
+    sp_lines <- SpatialLines(list(Lines(list(Line(paths[[1]])), "line1")))
+    
+    # I like for loops, what can I say...
+    for (p in 2:length(paths)) {
+      id <- paste0("line", as.character(p))
+      l <- SpatialLines(list(Lines(list(Line(paths[[p]])), id)))
+      sp_lines <- spRbind(sp_lines, l)
+    }
+    
+    return(sp_lines)
+  }
+}
+the_lines <- points_to_line(host_ff, 
+               long = "Longitude",
+               lat = "Latitude",
+               id_field = "Trip",
+               sort_field = "Time")
+```
+```{r}
+leaflet(data = the_lines) %>%
+  addTiles() %>%
+  addPolylines(data = the_lines) %>%
+  addCircleMarkers(data = filter_evt,
+           lng=~HvLongitude,
+           lat=~HvLatitude,
+           color = ~evt_pal(EventAppId),
+           stroke = FALSE) %>%
+         addLabelOnlyMarkers(data = filter_evt,
+           lng=~HvLongitude,
+           lat=~HvLatitude,
+           label = "H") %>%
+         addCircleMarkers(data = filter_evt,
+           lng=~RvLongitude,
+           lat=~RvLatitude,
+           color = ~evt_pal(EventAppId),
+           stroke = FALSE) %>%
+         addLabelOnlyMarkers(data = filter_evt,
+           lng=~RvLongitude,
+           lat=~RvLatitude,
+           label = "R")
+```
+
+```{r}
+reaction_time <- function(df) {
+  for (row in nrows(df)) {
+    
+  }
+}
+```
+
+```{r}
+# !formatR
+library(leaflet)
+# a manual legend
+leaflet() %>% addTiles() %>% addLegend(
+  position = "bottomright",
+  colors = rgb(t(col2rgb(palette())) / 255),
+  labels = palette(), opacity = 1,
+  title = "An Obvious Legend"
+)
+
+
+
+# an automatic legend derived from the color palette
+df <- local({
+  n <- 300; x <- rnorm(n); y <- rnorm(n)
+  z <- sqrt(x ^ 2 + y ^ 2); z[sample(n, 10)] <- NA
+  data.frame(x, y, z)
+})
+pal <- colorNumeric("OrRd", df$z)
+leaflet(df) %>%
+  addTiles() %>%
+  addCircleMarkers(~x, ~y, color = ~pal(z), group = "circles") %>%
+  addLegend(pal = pal, values = ~z, group = "circles", position = "bottomleft") %>%
+  addLayersControl(overlayGroups = c("circles"))
+
+# format legend labels
+df <- data.frame(x = rnorm(100), y = rexp(100, 2), z = runif(100))
+pal <- colorBin("PuOr", df$z, bins = c(0, .1, .4, .9, 1))
+leaflet(df) %>%
+  addTiles() %>%
+  addCircleMarkers(~x, ~y, color = ~pal(z), group = "circles") %>%
+  addLegend(pal = pal, values = ~z, group = "circles", position = "bottomleft") %>%
+  addLayersControl(overlayGroups = c("circles"))
+
+leaflet(df) %>%
+  addTiles() %>%
+  addCircleMarkers(~x, ~y, color = ~pal(z), group = "circles") %>%
+  addLegend(pal = pal, values = ~z, labFormat = labelFormat(
+    prefix = "(", suffix = ")%", between = ", ",
+    transform = function(x) 100 * x
+  ),  group = "circles", position = "bottomleft" ) %>%
+  addLayersControl(overlayGroups = c("circles"))
+```
+
+
+```{r}
+mean(host_ff$Latitude)
+mean(host_ff$Longitude)
+
+ output$geoplot <- renderLeaflet({
+    leaflet() %>%
+      setView(
+        lng = -83.373, 
+        lat = 40.232, 
+        zoom = 15) %>%
+      addTiles() 
+  })
+  
+  observeEvent(input$change_plot, {
+    if ('host_selected' %in% input$df_choices) {
+      leafletProxy("geoplot", data = host_f()) %>%
+        addCircleMarkers(
+          lng=~Longitude,
+          lat=~Latitude,
+          color = 'blue') 
+    }
+    if ('rv_bsm' %in% input$df_choices) {
+      leafletProxy("geoplot", data = rv_bsm_f()) %>%
+        addCircleMarkers(
+          lng=~Longitude,
+          lat=~Latitude,
+          color = 'red') 
+    }
+    if ('evt_warn' %in% input$df_choices) {
+      leafletProxy("geoplot", data = rv_bsm_f()) %>%
+        addCircleMarkers(
+          lng=~Longitude,
+          lat=~Latitude,
+          color = 'green') 
+    }
+  })
+```
+
+
+## Plot
+```{r}
+geoplot <- leaflet() %>%
+  setView(
+    lng = -83.373, 
+    lat = 40.232, 
+    zoom = 12) %>%
+  addTiles() 
+
+```
+
+
+```{r}
+host_f <- filter_host(dev)
+evt_f <- filter_df(evt_warn, dev)
+rv_bsm_f <- filter_df(rv_bsm, dev)
+
+geoplot <- leaflet() %>%
+  addTiles() %>%
+  setView(
+    lng = -83.373, 
+    lat = 40.232, 
+    zoom = 5)
+  addMarkers(data = host_f,
+             lng=~Longitude,
+             lat=~Latitude) %>%
+  addCircleMarkers(data = rv_bsm_f,
+                   lng=~Longitude,
+                   lat=~Latitude)
+  
+#leaflet(filter_df(rv_bsm, dev)) %>%
+#  addCircleMarkers(lng=~Longitude,
+#                   lat=~Latitude)
+
+```
+
+```{r}
+
+
+```
+
