@@ -18,6 +18,6 @@ This repository contains the Honda Team 3 project for the Spring 2019 Data-X at 
 3. __Baseline Model:__
 
     - [Process](https://github.com/caseyc49s/HT3---Public/blob/master/Preprocessing/bzw7_process.ipynb)
-    
+    - [Training and Results](https://github.com/caseyc49s/HT3---Public/blob/master/model_training/driver_reactiveness_train_bzw7.ipynb)
 
 
